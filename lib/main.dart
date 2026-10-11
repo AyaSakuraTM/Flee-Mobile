@@ -1,13 +1,18 @@
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'screens/login_screen.dart';
+import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/tracking_service.dart';
 
-void main() {
-  WidgetsFlutterBinding.ensureInitialized();
+void main() 
+{WidgetsFlutterBinding.ensureInitialized();
 
   FlutterForegroundTask.init(
     androidNotificationOptions: AndroidNotificationOptions(
@@ -28,10 +33,6 @@ void main() {
   runApp(const FleetOpsApp());
 }
 
-// ============================================================
-// APP
-// ============================================================
-
 class FleetOpsApp extends StatelessWidget {
   const FleetOpsApp({super.key});
 
@@ -44,18 +45,16 @@ class FleetOpsApp extends StatelessWidget {
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF2563EB),
-          brightness: Brightness.light,
         ),
-        scaffoldBackgroundColor: const Color(0xFFF5F7FB),
       ),
       home: const FleetOpsSplashScreen(),
     );
   }
 }
 
-// ============================================================
+// ------------------------------------------------------------
 // SPLASH SCREEN
-// ============================================================
+// ------------------------------------------------------------
 
 class FleetOpsSplashScreen extends StatefulWidget {
   const FleetOpsSplashScreen({super.key});
@@ -68,9 +67,7 @@ class FleetOpsSplashScreen extends StatefulWidget {
 class _FleetOpsSplashScreenState
     extends State<FleetOpsSplashScreen>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _logoAnimation;
-  late Animation<double> _textAnimation;
+  late final AnimationController _controller;
 
   @override
   void initState() {
@@ -78,53 +75,18 @@ class _FleetOpsSplashScreenState
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    );
+      duration: const Duration(milliseconds: 1200),
+    )..forward();
 
-    _logoAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutBack,
-    );
+    Future.delayed(const Duration(milliseconds: 1700), () {
+      if (!mounted) return;
 
-    _textAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(
-        0.25,
-        0.8,
-        curve: Curves.easeOut,
-      ),
-    );
-
-    _controller.forward();
-
-    Future.delayed(
-      const Duration(milliseconds: 2200),
-      () {
-        if (!mounted) return;
-
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder:
-                (context, animation, secondaryAnimation) =>
-                    const FleetOpsAuthGate(),
-            transitionsBuilder:
-                (
-                  context,
-                  animation,
-                  secondaryAnimation,
-                  child,
-                ) {
-              return FadeTransition(
-                opacity: animation,
-                child: child,
-              );
-            },
-            transitionDuration:
-                const Duration(milliseconds: 500),
-          ),
-        );
-      },
-    );
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const FleetOpsAuthGate(),
+        ),
+      );
+    });
   }
 
   @override
@@ -137,6 +99,7 @@ class _FleetOpsSplashScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
+        width: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -149,87 +112,59 @@ class _FleetOpsSplashScreenState
           ),
         ),
         child: SafeArea(
-          child: Center(
+          child: FadeTransition(
+            opacity: CurvedAnimation(
+              parent: _controller,
+              curve: Curves.easeIn,
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                ScaleTransition(
-                  scale: _logoAnimation,
-                  child: Container(
-                    width: 105,
-                    height: 105,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color:
-                              Colors.black.withValues(alpha: 0.20),
-                          blurRadius: 30,
-                          offset: const Offset(0, 12),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.local_shipping_rounded,
-                      size: 58,
-                      color: Color(0xFF2563EB),
-                    ),
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                  child: const Icon(
+                    Icons.local_shipping_rounded,
+                    size: 56,
+                    color: Color(0xFF2563EB),
                   ),
                 ),
-                const SizedBox(height: 28),
-                FadeTransition(
-                  opacity: _textAnimation,
-                  child: Column(
-                    children: [
-                      const Text(
-                        'FleetOps',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 38,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Smart Fleet Tracking',
-                        style: TextStyle(
-                          color:
-                              Colors.white.withValues(alpha: 0.85),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w400,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 24),
+                const Text(
+                  'FleetOps',
+                  style: TextStyle(
+                    fontSize: 38,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 55),
-                FadeTransition(
-                  opacity: _textAnimation,
-                  child: const SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(
-                        Colors.white,
-                      ),
-                    ),
+                const SizedBox(height: 8),
+                Text(
+                  'Smart Fleet Tracking',
+                  style: TextStyle(
+                    fontSize: 15,
+                    letterSpacing: 1,
+                    color: Colors.white.withValues(alpha: 0.8),
                   ),
                 ),
-                const SizedBox(height: 18),
-                FadeTransition(
-                  opacity: _textAnimation,
-                  child: Text(
-                    'Initializing...',
-                    style: TextStyle(
-                      color:
-                          Colors.white.withValues(alpha: 0.70),
-                      fontSize: 13,
-                    ),
+                const SizedBox(height: 48),
+                const SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Initializing...',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.75),
                   ),
                 ),
               ],
@@ -241,9 +176,9 @@ class _FleetOpsSplashScreenState
   }
 }
 
-// ============================================================
+// ------------------------------------------------------------
 // AUTHENTICATION GATE
-// ============================================================
+// ------------------------------------------------------------
 
 class FleetOpsAuthGate extends StatefulWidget {
   const FleetOpsAuthGate({super.key});
@@ -253,10 +188,7 @@ class FleetOpsAuthGate extends StatefulWidget {
       _FleetOpsAuthGateState();
 }
 
-class _FleetOpsAuthGateState
-    extends State<FleetOpsAuthGate> {
-  final AuthService _authService = AuthService();
-
+class _FleetOpsAuthGateState extends State<FleetOpsAuthGate> {
   @override
   void initState() {
     super.initState();
@@ -264,246 +196,323 @@ class _FleetOpsAuthGateState
   }
 
   Future<void> _checkAuthentication() async {
-    final loggedIn = await _authService.isLoggedIn();
+    final loggedIn = await AuthService().isLoggedIn();
 
     if (!mounted) return;
 
-    if (loggedIn) {
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder:
-              (context, animation, secondaryAnimation) =>
-                  const FleetOpsHomePage(),
-          transitionsBuilder:
-              (
-                context,
-                animation,
-                secondaryAnimation,
-                child,
-              ) {
-            return FadeTransition(
-              opacity: animation,
-              child: child,
-            );
-          },
-          transitionDuration:
-              const Duration(milliseconds: 500),
-        ),
-      );
-    } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => const LoginScreen(),
-        ),
-      );
-    }
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => loggedIn
+            ? const FleetOpsHomePage()
+            : const LoginScreen(),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      body: Center(
-        child: CircularProgressIndicator(),
-      ),
+      body: Center(child: CircularProgressIndicator()),
     );
   }
 }
 
-// ============================================================
+// ------------------------------------------------------------
 // HOME PAGE
-// ============================================================
+// ------------------------------------------------------------
 
 class FleetOpsHomePage extends StatefulWidget {
   const FleetOpsHomePage({super.key});
 
   @override
-  State<FleetOpsHomePage> createState() =>
-      _FleetOpsHomePageState();
+  State<FleetOpsHomePage> createState() => _FleetOpsHomePageState();
 }
 
-class _FleetOpsHomePageState
-    extends State<FleetOpsHomePage> {
-  bool isTracking = false;
+class _FleetOpsHomePageState extends State<FleetOpsHomePage>
+    with WidgetsBindingObserver {
+  final ApiService _apiService = ApiService();
+  final AuthService _authService = AuthService();
+  final FlutterSecureStorage _storage =
+      const FlutterSecureStorage();
+
+  static const String _selectedVehicleKey =
+      'fleetops_selected_vehicle_id';
+
   bool isDarkMode = false;
-
-  // Prevent multiple stop operations at the same time.
+  bool isTracking = false;
+  bool isStartingTracking = false;
   bool isStoppingTracking = false;
+  bool isLoadingDispatches = true;
 
-  // ==========================================================
+  bool _checkingTrackingStatus = false;
+  Timer? _trackingStatusTimer;
+
+  String? dispatchError;
+  String? loginEmail;
+  List<dynamic> dispatches = [];
+  int? expandedDispatchId;
+  int? trackingDispatchId;
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
+
+    _loadHomeData();
+
+    // Keep the home screen synchronized with the actual
+    // foreground service, including notification stop actions.
+    _trackingStatusTimer = Timer.periodic(
+      const Duration(seconds: 2),
+      (_) => _syncTrackingStatus(),
+    );
+
+    _syncTrackingStatus();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _syncTrackingStatus();
+    }
+  }
+
+  @override
+  void dispose() {
+    _trackingStatusTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  Future<void> _syncTrackingStatus() async {
+    if (_checkingTrackingStatus || !mounted) return;
+
+    _checkingTrackingStatus = true;
+
+    try {
+      final running =
+          await FlutterForegroundTask.isRunningService;
+
+      if (!mounted) return;
+
+      if (!running) {
+        // Clear only the selected vehicle. Do not clear the
+        // login token or sign the user out.
+        await _storage.delete(key: _selectedVehicleKey);
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        isTracking = running;
+
+        if (!running) {
+          trackingDispatchId = null;
+          isStartingTracking = false;
+          isStoppingTracking = false;
+        }
+      });
+    } catch (e) {
+      debugPrint('FleetOps tracking status sync failed: $e');
+    } finally {
+      _checkingTrackingStatus = false;
+    }
+  }
+
+  Future<void> _loadHomeData() async {
+    loginEmail = await _authService.getLoginEmail();
+
+    if (mounted) {
+      setState(() {});
+    }
+
+    await _loadDispatches();
+  }
+
+  Future<void> _loadDispatches() async {
+    if (mounted) {
+      setState(() {
+        isLoadingDispatches = true;
+        dispatchError = null;
+      });
+    }
+
+    try {
+      final result = await _apiService.getMyActiveDispatches();
+
+      if (!mounted) return;
+
+      setState(() {
+        dispatches = result;
+        isLoadingDispatches = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        dispatchError = _readableError(e);
+        dispatches = [];
+        isLoadingDispatches = false;
+      });
+    }
+  }
+
+  String _readableError(Object error) {
+    return error
+        .toString()
+        .replaceFirst('Exception: ', '')
+        .trim();
+  }
+
+  String _value(dynamic item, String key) {
+    if (item is! Map) return '';
+    return item[key]?.toString() ?? '';
+  }
+
+  int? _intValue(dynamic item, String key) {
+    final value = _value(item, key);
+    return int.tryParse(value);
+  }
+
+  String _dispatchNumber(dynamic item) {
+    final number = _value(item, 'dispatch_no');
+
+    if (number.isNotEmpty && number != 'null') {
+      return number;
+    }
+
+    final id = _value(item, 'id');
+    return id.isNotEmpty ? 'Dispatch #$id' : 'Dispatch';
+  }
+
+  // ----------------------------------------------------------
   // LOGOUT
-  // ==========================================================
+  // ----------------------------------------------------------
 
   Future<void> _logout() async {
-    // Stop tracking before logging out.
     if (isTracking) {
       try {
-        debugPrint(
-          'FleetOps: stopping tracking during logout...',
-        );
-
         await FlutterForegroundTask.stopService();
-
-        debugPrint(
-          'FleetOps: tracking stopped during logout.',
-        );
+        await _storage.delete(key: _selectedVehicleKey);
       } catch (e) {
-        debugPrint(
-          'FleetOps: error stopping tracking during logout: $e',
-        );
+        debugPrint('FleetOps: could not stop tracking: $e');
       }
     }
 
-    await AuthService().logout();
+    await _authService.logout();
 
     if (!mounted) return;
 
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const LoginScreen(),
-      ),
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
     );
   }
 
-  // ==========================================================
-  // LOCATION TRACKING
-  // ==========================================================
+  // ----------------------------------------------------------
+  // TRACKING
+  // ----------------------------------------------------------
 
-  Future<void> toggleTracking() async {
-    // Prevent another operation while stopping.
-    if (isStoppingTracking) {
+  Future<void> _toggleTracking(Map dispatch) async {
+    if (isStartingTracking || isStoppingTracking) return;
+
+    final dispatchId = int.tryParse(
+      dispatch['id']?.toString() ?? '',
+    );
+
+    final vehicleId = int.tryParse(
+      dispatch['vehicle_id']?.toString() ?? '',
+    );
+
+    if (dispatchId == null ||
+        vehicleId == null ||
+        vehicleId <= 0) {
+      _showMessage(
+        'This dispatch has no valid vehicle assigned.',
+      );
       return;
     }
-
-    // --------------------------------------------------------
-    // STOP TRACKING
-    // --------------------------------------------------------
 
     if (isTracking) {
-      if (!mounted) return;
+      if (trackingDispatchId != dispatchId) {
+        _showMessage(
+          'Stop the current tracking session before selecting another dispatch.',
+        );
+        return;
+      }
 
-      // Immediately lock the button.
-      setState(() {
-        isStoppingTracking = true;
-      });
+      setState(() => isStoppingTracking = true);
 
       try {
-        debugPrint(
-          'FleetOps: stopping tracking service...',
-        );
-
         await FlutterForegroundTask.stopService();
+        await _storage.delete(key: _selectedVehicleKey);
 
-        debugPrint(
-          'FleetOps: tracking service stopped successfully.',
-        );
+        if (!mounted) return;
+
+        setState(() {
+          isTracking = false;
+          isStoppingTracking = false;
+          trackingDispatchId = null;
+        });
+
+        _showMessage('Location tracking stopped.');
       } catch (e) {
-        // We don't let an error during shutdown
-        // crash the Flutter UI.
-        debugPrint(
-          'FleetOps: error stopping tracking service: $e',
-        );
+        if (!mounted) return;
+
+        setState(() => isStoppingTracking = false);
+        _showMessage('Could not stop tracking: $e');
       }
 
-      if (!mounted) return;
-
-      // Update the UI only after the stop request
-      // has finished.
-      setState(() {
-        isTracking = false;
-        isStoppingTracking = false;
-      });
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Location tracking stopped',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-
       return;
     }
 
-    // --------------------------------------------------------
-    // START TRACKING
-    // --------------------------------------------------------
-
-    final serviceEnabled =
-        await Geolocator.isLocationServiceEnabled();
-
-    if (!serviceEnabled) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Please turn on your device location service.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-
-      return;
-    }
-
-    LocationPermission permission =
-        await Geolocator.checkPermission();
-
-    if (permission == LocationPermission.denied) {
-      permission =
-          await Geolocator.requestPermission();
-    }
-
-    if (permission == LocationPermission.denied ||
-        permission ==
-            LocationPermission.deniedForever) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Location permission is required for tracking.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-
-      return;
-    }
+    setState(() => isStartingTracking = true);
 
     try {
-      // ------------------------------------------------------
-      // NOTIFICATION PERMISSION
-      // ------------------------------------------------------
+      final serviceEnabled =
+          await Geolocator.isLocationServiceEnabled();
 
-      final notificationPermission =
-          await FlutterForegroundTask
-              .checkNotificationPermission();
-
-      if (notificationPermission !=
-          NotificationPermission.granted) {
-        await FlutterForegroundTask
-            .requestNotificationPermission();
+      if (!serviceEnabled) {
+        _showMessage(
+          'Please turn on your device location service.',
+        );
+        return;
       }
 
-      // ------------------------------------------------------
-      // START FOREGROUND TRACKING SERVICE
-      // ------------------------------------------------------
+      LocationPermission permission =
+          await Geolocator.checkPermission();
 
-      debugPrint(
-        'FleetOps: starting tracking service...',
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _showMessage(
+          'Location permission is required for tracking.',
+        );
+        return;
+      }
+
+      final notificationPermission =
+          await FlutterForegroundTask.checkNotificationPermission();
+
+      if (notificationPermission != NotificationPermission.granted) {
+        await FlutterForegroundTask.requestNotificationPermission();
+      }
+
+      // Save the selected vehicle ID for the background task.
+      // tracking_service.dart must read this same key.
+      await _storage.write(
+        key: _selectedVehicleKey,
+        value: vehicleId.toString(),
       );
 
       await FlutterForegroundTask.startService(
         serviceId: 256,
         notificationTitle: 'FleetOps',
-        notificationText:
-            'Location tracking is active',
+        notificationText: 'Location tracking is active',
         notificationButtons: const [
           NotificationButton(
             id: 'stop_tracking',
@@ -518,45 +527,50 @@ class _FleetOpsHomePageState
 
       setState(() {
         isTracking = true;
+        trackingDispatchId = dispatchId;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Location tracking started',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
+      _showMessage(
+        'Tracking started for ${_dispatchNumber(dispatch)}.',
       );
     } catch (e) {
-      debugPrint(
-        'FleetOps: unable to start tracking: $e',
-      );
+      await _storage.delete(key: _selectedVehicleKey);
 
       if (!mounted) return;
 
       setState(() {
         isTracking = false;
+        trackingDispatchId = null;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to start tracking: $e',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showMessage('Unable to start tracking: $e');
+    } finally {
+      if (mounted) {
+        setState(() => isStartingTracking = false);
+      }
     }
   }
 
-  // ==========================================================
-  // HOME UI
-  // ==========================================================
+  void _showMessage(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  // ----------------------------------------------------------
+  // UI
+  // ----------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = isDarkMode
+    final background = isDarkMode
         ? const Color(0xFF0F172A)
         : const Color(0xFFF5F7FB);
 
@@ -573,19 +587,14 @@ class _FleetOpsHomePageState
         : const Color(0xFF64748B);
 
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding:
-              const EdgeInsets.fromLTRB(20, 18, 20, 30),
-          child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+        child: RefreshIndicator(
+          onRefresh: _loadDispatches,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
             children: [
-              // ==================================================
-              // HEADER
-              // ==================================================
-
+              // Header
               Row(
                 children: [
                   Container(
@@ -593,8 +602,7 @@ class _FleetOpsHomePageState
                     height: 48,
                     decoration: BoxDecoration(
                       color: const Color(0xFF2563EB),
-                      borderRadius:
-                          BorderRadius.circular(15),
+                      borderRadius: BorderRadius.circular(15),
                     ),
                     child: const Icon(
                       Icons.local_shipping_rounded,
@@ -605,15 +613,13 @@ class _FleetOpsHomePageState
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'FleetOps',
                           style: TextStyle(
                             fontSize: 23,
-                            fontWeight:
-                                FontWeight.w800,
+                            fontWeight: FontWeight.w800,
                             color: primaryText,
                           ),
                         ),
@@ -628,17 +634,18 @@ class _FleetOpsHomePageState
                     ),
                   ),
                   IconButton(
-                    onPressed: () {},
+                    tooltip: 'Refresh dispatches',
+                    onPressed:
+                        isLoadingDispatches ? null : _loadDispatches,
                     icon: Icon(
-                      Icons.notifications_none_rounded,
+                      Icons.refresh_rounded,
                       color: primaryText,
                     ),
                   ),
                   IconButton(
+                    tooltip: isDarkMode ? 'Light mode' : 'Dark mode',
                     onPressed: () {
-                      setState(() {
-                        isDarkMode = !isDarkMode;
-                      });
+                      setState(() => isDarkMode = !isDarkMode);
                     },
                     icon: Icon(
                       isDarkMode
@@ -648,8 +655,8 @@ class _FleetOpsHomePageState
                     ),
                   ),
                   IconButton(
-                    onPressed: _logout,
                     tooltip: 'Logout',
+                    onPressed: _logout,
                     icon: const Icon(
                       Icons.logout_rounded,
                       color: Colors.red,
@@ -660,10 +667,6 @@ class _FleetOpsHomePageState
 
               const SizedBox(height: 28),
 
-              // ==================================================
-              // WELCOME TEXT
-              // ==================================================
-
               Text(
                 'Welcome back 👋',
                 style: TextStyle(
@@ -671,416 +674,499 @@ class _FleetOpsHomePageState
                   color: secondaryText,
                 ),
               ),
-
-              const SizedBox(height: 4),
-
+              const SizedBox(height: 5),
               Text(
-                'Track your fleet',
+                'Your dispatches',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
                   color: primaryText,
                 ),
               ),
-
-              const SizedBox(height: 20),
-
-              // ==================================================
-              // LIVE TRACKING CARD
-              // ==================================================
-
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF2563EB),
-                      Color(0xFF1D4ED8),
-                    ],
-                  ),
-                  borderRadius:
-                      BorderRadius.circular(26),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF2563EB)
-                          .withValues(alpha: 0.25),
-                      blurRadius: 25,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
+              const SizedBox(height: 8),
+              Text(
+                'Select an active dispatch to view its details and start tracking.',
+                style: TextStyle(
+                  height: 1.4,
+                  color: secondaryText,
                 ),
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+              ),
+
+              const SizedBox(height: 22),
+
+              // Tracking status banner
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: cardColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isTracking
+                        ? const Color(0xFF22C55E)
+                            .withValues(alpha: 0.6)
+                        : (isDarkMode
+                            ? Colors.white10
+                            : const Color(0xFFE2E8F0)),
+                  ),
+                ),
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: Colors.white
-                                .withValues(alpha: 0.15),
-                            borderRadius:
-                                BorderRadius.circular(13),
-                          ),
-                          child: const Icon(
-                            Icons.gps_fixed_rounded,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'LIVE TRACKING',
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isTracking
+                            ? const Color(0xFFDCFCE7)
+                            : const Color(0xFFDBEAFE),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        isTracking
+                            ? Icons.gps_fixed_rounded
+                            : Icons.gps_not_fixed_rounded,
+                        color: isTracking
+                            ? const Color(0xFF15803D)
+                            : const Color(0xFF1D4ED8),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isTracking
+                                ? 'Tracking is active'
+                                : 'Tracking is stopped',
                             style: TextStyle(
-                              color: Colors.white,
-                              fontWeight:
-                                  FontWeight.w700,
-                              fontSize: 13,
-                              letterSpacing: 1.1,
+                              color: primaryText,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
                             ),
                           ),
-                        ),
-                        Container(
-                          padding:
-                              const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white
-                                .withValues(alpha: 0.15),
-                            borderRadius:
-                                BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 7,
-                                height: 7,
-                                decoration:
-                                    BoxDecoration(
-                                  color: isTracking
-                                      ? const Color(
-                                          0xFF4ADE80,
-                                        )
-                                      : Colors.white70,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                isTracking
-                                    ? 'ACTIVE'
-                                    : 'OFFLINE',
-                                style:
-                                    const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight:
-                                      FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 25),
-
-                    Row(
-                      children: [
-                        Container(
-                          width: 70,
-                          height: 70,
-                          decoration: BoxDecoration(
-                            color: Colors.white
-                                .withValues(alpha: 0.14),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.location_on_rounded,
-                            color: Colors.white,
-                            size: 38,
-                          ),
-                        ),
-                        const SizedBox(width: 18),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Vehicle Location',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                isTracking
-                                    ? 'Tracking active'
-                                    : 'Tracking is off',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight:
-                                      FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // ==================================================
-                    // TRACKING BUTTON
-                    // ==================================================
-
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: isStoppingTracking
-                            ? null
-                            : toggleTracking,
-                        style:
-                            ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor:
-                              const Color(0xFF1D4ED8),
-                          disabledBackgroundColor:
-                              Colors.white70,
-                          elevation: 0,
-                          shape:
-                              RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(15),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.center,
-                          children: [
-                            if (isStoppingTracking)
-                              const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child:
-                                    CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            else
-                              Icon(
-                                isTracking
-                                    ? Icons.stop_rounded
-                                    : Icons.play_arrow_rounded,
-                              ),
-                            const SizedBox(width: 8),
-                            Text(
-                              isStoppingTracking
-                                  ? 'Stopping...'
-                                  : isTracking
-                                      ? 'Stop Tracking'
-                                      : 'Start Tracking',
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight:
-                                    FontWeight.w700,
-                              ),
+                          const SizedBox(height: 4),
+                          Text(
+                            isTracking
+                                ? 'GPS updates are being sent in the background.'
+                                : 'Start tracking from an active dispatch below.',
+                            style: TextStyle(
+                              color: secondaryText,
+                              fontSize: 12,
+                              height: 1.35,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 26),
 
-              // ==================================================
-              // MAP PREVIEW
-              // ==================================================
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Active dispatches',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: primaryText,
+                      ),
+                    ),
+                  ),
+                  if (!isLoadingDispatches)
+                    Text(
+                      '${dispatches.length} found',
+                      style: TextStyle(
+                        color: secondaryText,
+                        fontSize: 12,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
 
+              if (isLoadingDispatches)
+                Container(
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (dispatchError != null)
+                _messageCard(
+                  cardColor: cardColor,
+                  primaryText: primaryText,
+                  secondaryText: secondaryText,
+                  icon: Icons.cloud_off_rounded,
+                  title: 'Could not load dispatches',
+                  message: dispatchError!,
+                  buttonLabel: 'Try again',
+                  onPressed: _loadDispatches,
+                )
+              else if (dispatches.isEmpty)
+                _messageCard(
+                  cardColor: cardColor,
+                  primaryText: primaryText,
+                  secondaryText: secondaryText,
+                  icon: Icons.local_shipping_outlined,
+                  title: 'No active dispatches',
+                  message:
+                      'There are no active dispatches linked to your driver account. Ask your fleet administrator to check your driver assignment.',
+                  buttonLabel: 'Refresh',
+                  onPressed: _loadDispatches,
+                )
+              else
+                ...dispatches.map((rawDispatch) {
+                  final dispatch = rawDispatch is Map
+                      ? rawDispatch
+                      : <String, dynamic>{};
+
+                  final dispatchId = _intValue(dispatch, 'id');
+                  final expanded =
+                      dispatchId != null &&
+                      expandedDispatchId == dispatchId;
+
+                  final isThisTracking =
+                      dispatchId != null &&
+                      trackingDispatchId == dispatchId &&
+                      isTracking;
+
+                  final origin = _value(dispatch, 'origin');
+                  final destination =
+                      _value(dispatch, 'destination');
+                  final vehicleCode =
+                      _value(dispatch, 'vehicle_code');
+                  final plateNumber =
+                      _value(dispatch, 'plate_number');
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: isThisTracking
+                            ? const Color(0xFF22C55E)
+                            : (isDarkMode
+                                ? Colors.white10
+                                : const Color(0xFFE2E8F0)),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        InkWell(
+                          borderRadius: BorderRadius.circular(22),
+                          onTap: () {
+                            setState(() {
+                              expandedDispatchId = expanded
+                                  ? null
+                                  : dispatchId;
+                            });
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: isThisTracking
+                                        ? const Color(0xFFDCFCE7)
+                                        : const Color(0xFFDBEAFE),
+                                    borderRadius:
+                                        BorderRadius.circular(15),
+                                  ),
+                                  child: Icon(
+                                    Icons.local_shipping_rounded,
+                                    color: isThisTracking
+                                        ? const Color(0xFF15803D)
+                                        : const Color(0xFF2563EB),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _dispatchNumber(dispatch),
+                                        style: TextStyle(
+                                          color: primaryText,
+                                          fontSize: 15,
+                                          fontWeight:
+                                              FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 5),
+                                      Text(
+                                        vehicleCode.isNotEmpty
+                                            ? vehicleCode
+                                            : (plateNumber.isNotEmpty
+                                                ? plateNumber
+                                                : 'Assigned vehicle'),
+                                        style: TextStyle(
+                                          color: secondaryText,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 7),
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.circle,
+                                            size: 8,
+                                            color: Color(0xFF22C55E),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            isThisTracking
+                                                ? 'Tracking now'
+                                                : 'Active',
+                                            style: const TextStyle(
+                                              color: Color(0xFF16A34A),
+                                              fontSize: 12,
+                                              fontWeight:
+                                                  FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  expanded
+                                      ? Icons.keyboard_arrow_up_rounded
+                                      : Icons.keyboard_arrow_down_rounded,
+                                  color: secondaryText,
+                                  size: 26,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        if (expanded) ...[
+                          Divider(
+                            height: 1,
+                            color: isDarkMode
+                                ? Colors.white10
+                                : const Color(0xFFE2E8F0),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              16,
+                              16,
+                              16,
+                              18,
+                            ),
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                _routeRow(
+                                  icon: Icons.trip_origin_rounded,
+                                  iconColor: const Color(0xFF16A34A),
+                                  label: 'ORIGIN',
+                                  value: origin.isEmpty
+                                      ? 'Not provided'
+                                      : origin,
+                                  primaryText: primaryText,
+                                  secondaryText: secondaryText,
+                                ),
+                                const SizedBox(height: 15),
+                                _routeRow(
+                                  icon: Icons.location_on_rounded,
+                                  iconColor: const Color(0xFFEF4444),
+                                  label: 'DESTINATION',
+                                  value: destination.isEmpty
+                                      ? 'Not provided'
+                                      : destination,
+                                  primaryText: primaryText,
+                                  secondaryText: secondaryText,
+                                ),
+                                const SizedBox(height: 15),
+                                _detailRow(
+                                  'Vehicle code',
+                                  vehicleCode.isEmpty
+                                      ? 'Not provided'
+                                      : vehicleCode,
+                                  primaryText,
+                                  secondaryText,
+                                ),
+                                const SizedBox(height: 8),
+                                _detailRow(
+                                  'Plate number',
+                                  plateNumber.isEmpty
+                                      ? 'Not provided'
+                                      : plateNumber,
+                                  primaryText,
+                                  secondaryText,
+                                ),
+                                const SizedBox(height: 18),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton.icon(
+                                    onPressed:
+                                        (isStartingTracking ||
+                                                isStoppingTracking ||
+                                                (isTracking &&
+                                                    !isThisTracking))
+                                            ? null
+                                            : () => _toggleTracking(
+                                                  dispatch,
+                                                ),
+                                    icon: Icon(
+                                      isThisTracking
+                                          ? Icons.stop_circle_rounded
+                                          : Icons.gps_fixed_rounded,
+                                    ),
+                                    label: Text(
+                                      isStartingTracking
+                                          ? 'Starting tracking...'
+                                          : isStoppingTracking
+                                              ? 'Stopping tracking...'
+                                              : isThisTracking
+                                                  ? 'Stop tracking'
+                                                  : 'Start delivery tracking',
+                                    ),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: isThisTracking
+                                          ? const Color(0xFFDC2626)
+                                          : const Color(0xFF2563EB),
+                                      foregroundColor: Colors.white,
+                                      padding:
+                                          const EdgeInsets.symmetric(
+                                        vertical: 15,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                if (isTracking &&
+                                    !isThisTracking) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Another dispatch is currently being tracked. Stop it before starting this one.',
+                                    style: TextStyle(
+                                      color: secondaryText,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                }),
+
+              const SizedBox(height: 12),
+
+              // Map placeholder retained from the previous home screen.
               Container(
-                width: double.infinity,
-                height: 220,
+                height: 170,
                 decoration: BoxDecoration(
                   color: cardColor,
-                  borderRadius:
-                      BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black
-                          .withValues(alpha: 0.05),
-                      blurRadius: 15,
-                      offset: const Offset(0, 6),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: isDarkMode
+                        ? Colors.white10
+                        : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(22),
+                        child: CustomPaint(
+                          painter: _MapPreviewPainter(
+                            isDarkMode: isDarkMode,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 15,
+                      left: 16,
+                      child: Text(
+                        'MAP PREVIEW',
+                        style: TextStyle(
+                          color: secondaryText,
+                          fontSize: 11,
+                          letterSpacing: 1,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    Center(
+                      child: Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2563EB),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white,
+                            width: 4,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.local_shipping_rounded,
+                          color: Colors.white,
+                          size: 25,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 14,
+                      left: 16,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.location_on_outlined,
+                            size: 16,
+                            color: secondaryText,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            isTracking
+                                ? 'Tracking service running'
+                                : 'Map illustration — not live GPS',
+                            style: TextStyle(
+                              color: secondaryText,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
-                ),
-                child: ClipRRect(
-                  borderRadius:
-                      BorderRadius.circular(24),
-                  child: Stack(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: isDarkMode
-                                ? const [
-                                    Color(0xFF1E293B),
-                                    Color(0xFF334155),
-                                  ]
-                                : const [
-                                    Color(0xFFEFF6FF),
-                                    Color(0xFFDBEAFE),
-                                  ],
-                          ),
-                        ),
-                      ),
-
-                      Positioned(
-                        top: 65,
-                        left: -30,
-                        right: -20,
-                        child: Transform.rotate(
-                          angle: -0.15,
-                          child: Container(
-                            height: 3,
-                            color: isDarkMode
-                                ? Colors.white10
-                                : Colors.white,
-                          ),
-                        ),
-                      ),
-
-                      Positioned(
-                        top: 135,
-                        left: -20,
-                        right: -30,
-                        child: Transform.rotate(
-                          angle: 0.18,
-                          child: Container(
-                            height: 3,
-                            color: isDarkMode
-                                ? Colors.white10
-                                : Colors.white,
-                          ),
-                        ),
-                      ),
-
-                      Positioned(
-                        top: 100,
-                        left: 90,
-                        child: Transform.rotate(
-                          angle: 1.1,
-                          child: Container(
-                            width: 3,
-                            height: 160,
-                            color: isDarkMode
-                                ? Colors.white10
-                                : Colors.white,
-                          ),
-                        ),
-                      ),
-
-                      Center(
-                        child: Container(
-                          width: 58,
-                          height: 58,
-                          decoration: BoxDecoration(
-                            color:
-                                const Color(0xFF2563EB),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white,
-                              width: 4,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(
-                                  0xFF2563EB,
-                                ).withValues(
-                                  alpha: 0.35,
-                                ),
-                                blurRadius: 15,
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.local_shipping_rounded,
-                            color: Colors.white,
-                            size: 27,
-                          ),
-                        ),
-                      ),
-
-                      Positioned(
-                        top: 18,
-                        left: 18,
-                        child: Text(
-                          'MAP PREVIEW',
-                          style: TextStyle(
-                            color: secondaryText,
-                            fontWeight:
-                                FontWeight.w700,
-                            fontSize: 11,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                      ),
-
-                      Positioned(
-                        bottom: 15,
-                        left: 18,
-                        right: 18,
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.location_on_outlined,
-                              size: 16,
-                              color: secondaryText,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              isTracking
-                                  ? 'Current location'
-                                  : 'Waiting for GPS',
-                              style: TextStyle(
-                                color: secondaryText,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
 
               const SizedBox(height: 24),
-
-              // ==================================================
-              // FOOTER
-              // ==================================================
-
               Center(
                 child: Text(
-                  'FleetOps • Fleet Tracking System',
+                  loginEmail == null || loginEmail!.isEmpty
+                      ? 'FleetOps • Fleet Tracking System'
+                      : 'Signed in as $loginEmail',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     color: secondaryText,
                     fontSize: 11,
@@ -1092,5 +1178,185 @@ class _FleetOpsHomePageState
         ),
       ),
     );
+  }
+
+  Widget _messageCard({
+    required Color cardColor,
+    required Color primaryText,
+    required Color secondaryText,
+    required IconData icon,
+    required String title,
+    required String message,
+    required String buttonLabel,
+    required VoidCallback onPressed,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 38, color: secondaryText),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: primaryText,
+              fontWeight: FontWeight.w800,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: secondaryText,
+              height: 1.4,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: onPressed,
+            icon: const Icon(Icons.refresh_rounded),
+            label: Text(buttonLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _routeRow({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+    required Color primaryText,
+    required Color secondaryText,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: iconColor, size: 19),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: secondaryText,
+                  fontSize: 10,
+                  letterSpacing: 0.8,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: TextStyle(
+                  color: primaryText,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _detailRow(
+    String label,
+    String value,
+    Color primaryText,
+    Color secondaryText,
+  ) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: secondaryText,
+              fontSize: 12,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              color: primaryText,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ------------------------------------------------------------
+// DECORATIVE MAP PREVIEW (NOT A LIVE MAP)
+// ------------------------------------------------------------
+
+class _MapPreviewPainter extends CustomPainter {
+  _MapPreviewPainter({required this.isDarkMode});
+
+  final bool isDarkMode;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final roadPaint = Paint()
+      ..color = isDarkMode
+          ? const Color(0xFF334155)
+          : const Color(0xFFFFFFFF)
+      ..strokeWidth = 8
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final thinRoadPaint = Paint()
+      ..color = isDarkMode
+          ? const Color(0xFF475569)
+          : const Color(0xFFDBEAFE)
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final paths = <Path>[
+      Path()
+        ..moveTo(-10, size.height * 0.25)
+        ..lineTo(size.width * 0.35, size.height * 0.55)
+        ..lineTo(size.width * 0.70, size.height * 0.20)
+        ..lineTo(size.width + 10, size.height * 0.45),
+      Path()
+        ..moveTo(size.width * 0.10, size.height + 10)
+        ..lineTo(size.width * 0.45, size.height * 0.55)
+        ..lineTo(size.width * 0.60, -10),
+      Path()
+        ..moveTo(size.width * 0.80, size.height + 10)
+        ..lineTo(size.width * 0.68, size.height * 0.65)
+        ..lineTo(size.width + 10, size.height * 0.70),
+    ];
+
+    for (final path in paths) {
+      canvas.drawPath(path, roadPaint);
+      canvas.drawPath(path, thinRoadPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MapPreviewPainter oldDelegate) {
+    return oldDelegate.isDarkMode != isDarkMode;
   }
 }

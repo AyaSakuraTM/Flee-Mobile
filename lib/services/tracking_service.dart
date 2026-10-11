@@ -1,3 +1,4 @@
+
 import 'dart:convert';
 
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -15,7 +16,8 @@ void startCallback() {
 }
 
 class FleetOpsTaskHandler extends TaskHandler {
-  static const int vehicleId = 1;
+  static const String _selectedVehicleKey =
+      'fleetops_selected_vehicle_id';
 
   final FlutterSecureStorage _storage =
       const FlutterSecureStorage();
@@ -32,8 +34,6 @@ class FleetOpsTaskHandler extends TaskHandler {
 
   @override
   void onRepeatEvent(DateTime timestamp) async {
-    // Prevent another GPS request from starting while
-    // the previous one is still running.
     if (_isUpdating) {
       print('FleetOps GPS update already running. Skipping.');
       return;
@@ -42,50 +42,44 @@ class FleetOpsTaskHandler extends TaskHandler {
     _isUpdating = true;
 
     try {
+      // Check that location services are enabled.
       final serviceEnabled =
           await Geolocator.isLocationServiceEnabled();
 
-      print(
-        'FleetOps GPS service enabled: $serviceEnabled',
-      );
-
       if (!serviceEnabled) {
-        print(
-          'FleetOps GPS: location service is disabled.',
-        );
+        print('FleetOps GPS: location service is disabled.');
         return;
       }
 
-      final permission =
-          await Geolocator.checkPermission();
-
-      print(
-        'FleetOps GPS permission: $permission',
-      );
+      // Check location permission.
+      final permission = await Geolocator.checkPermission();
 
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        print(
-          'FleetOps GPS: location permission unavailable.',
-        );
+        print('FleetOps GPS: location permission unavailable.');
         return;
       }
 
-      // Get current emulator/device position.
-      final position =
-          await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
+      // Read the selected vehicle ID saved by main.dart.
+      final savedVehicleId = await _storage.read(
+        key: _selectedVehicleKey,
       );
 
-      print(
-        'FleetOps GPS position: '
-        '${position.latitude.toStringAsFixed(6)}, '
-        '${position.longitude.toStringAsFixed(6)}',
+      final vehicleId = int.tryParse(
+        savedVehicleId ?? '',
       );
 
-      // Get authentication token.
+      if (vehicleId == null || vehicleId <= 0) {
+        print(
+          'FleetOps tracking: no valid selected vehicle ID. '
+          'Stopping tracking to avoid updating the wrong vehicle.',
+        );
+
+        await FlutterForegroundTask.stopService();
+        return;
+      }
+
+      // Read the authenticated account token.
       final token = await _storage.read(
         key: 'sanctum_token',
       );
@@ -94,16 +88,25 @@ class FleetOpsTaskHandler extends TaskHandler {
         print(
           'FleetOps tracking: authentication token missing.',
         );
+
+        await FlutterForegroundTask.stopService();
         return;
       }
 
-      // Convert meters/second to kilometers/hour.
-      final speedKmh =
-          (position.speed * 3.6).clamp(
+      // Get the device's current position.
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      // Convert meters per second to kilometers per hour.
+      final speedKmh = (position.speed * 3.6).clamp(
         0.0,
         double.infinity,
       );
 
+      // Send the location to the authenticated Laravel API.
       final response = await http
           .post(
             Uri.parse(
@@ -119,8 +122,7 @@ class FleetOpsTaskHandler extends TaskHandler {
               'latitude': position.latitude,
               'longitude': position.longitude,
               'speed': speedKmh,
-              'timestamp':
-                  DateTime.now().toIso8601String(),
+              'timestamp': DateTime.now().toIso8601String(),
             }),
           )
           .timeout(
@@ -130,29 +132,29 @@ class FleetOpsTaskHandler extends TaskHandler {
       if (response.statusCode >= 200 &&
           response.statusCode < 300) {
         print(
-          'FleetOps GPS update: '
-          '${response.statusCode} '
-          '(${position.latitude.toStringAsFixed(6)}, '
-          '${position.longitude.toStringAsFixed(6)})',
+          'FleetOps GPS update successful. '
+          'Vehicle ID: $vehicleId; '
+          'coordinates: '
+          '${position.latitude.toStringAsFixed(6)}, '
+          '${position.longitude.toStringAsFixed(6)}',
         );
       } else {
         print(
           'FleetOps GPS update failed: '
           'HTTP ${response.statusCode}',
         );
+        print('Response: ${response.body}');
 
-        print(
-          'Response: ${response.body}',
-        );
+        // Stop if the server rejects authentication.
+        if (response.statusCode == 401) {
+          await FlutterForegroundTask.stopService();
+        }
       }
     } catch (e) {
-      // Don't allow an individual GPS/API error
-      // to kill the foreground service.
-      print(
-        'FleetOps tracking error: $e',
-      );
+      // An individual GPS/network failure should not crash
+      // the foreground task.
+      print('FleetOps tracking error: $e');
     } finally {
-      // Always allow the next update to run.
       _isUpdating = false;
     }
   }
@@ -162,29 +164,18 @@ class FleetOpsTaskHandler extends TaskHandler {
     DateTime timestamp,
     bool isTimeout,
   ) async {
-    print(
-      'FleetOps tracking service stopped.',
-    );
-
-    // Mark the current update as finished so the
-    // service can shut down cleanly.
+    print('FleetOps tracking service stopped.');
     _isUpdating = false;
   }
 
   @override
   void onReceiveData(Object data) {
-    print(
-      'FleetOps received data: $data',
-    );
+    print('FleetOps received data: $data');
   }
 
   @override
-  void onNotificationButtonPressed(
-    String id,
-  ) {
-    print(
-      'Notification button pressed: $id',
-    );
+  void onNotificationButtonPressed(String id) {
+    print('FleetOps notification button pressed: $id');
 
     if (id == 'stop_tracking') {
       FlutterForegroundTask.stopService();
@@ -193,15 +184,11 @@ class FleetOpsTaskHandler extends TaskHandler {
 
   @override
   void onNotificationPressed() {
-    print(
-      'FleetOps notification pressed.',
-    );
+    print('FleetOps tracking notification pressed.');
   }
 
   @override
   void onNotificationDismissed() {
-    print(
-      'FleetOps notification dismissed.',
-    );
+    print('FleetOps tracking notification dismissed.');
   }
 }
