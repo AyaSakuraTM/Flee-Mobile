@@ -631,10 +631,14 @@ class _FleetOpsHomePageState extends State<FleetOpsHomePage>
     final destination = _value(dispatch, 'destination').trim();
     final lat = _coordinate(dispatch, 'dest_lat');
     final lng = _coordinate(dispatch, 'dest_lng');
-    final hasCoordinates = lat != null && lng != null &&
-        lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+    final hasCoordinates = lat != null &&
+        lng != null &&
+        lat >= -90 &&
+        lat <= 90 &&
+        lng >= -180 &&
+        lng <= 180;
 
-    if (!hasCoordinates && destination.isEmpty) {
+    if (destination.isEmpty && !hasCoordinates) {
       _showMessage('This dispatch has no destination address or coordinates.');
       return;
     }
@@ -666,23 +670,39 @@ class _FleetOpsHomePageState extends State<FleetOpsHomePage>
 
     if (choice == null || !mounted) return;
 
-    final destinationQuery = hasCoordinates
-        ? '${lat.toString()},${lng.toString()}'
-        : destination;
-    // The Google Maps navigation URI uses the phone's live location as
-    // the starting point and opens turn-by-turn driving navigation.
+    // Prefer the human-readable place selected on the website. Older dispatches
+    // may have incorrect geocoded coordinates; using them unconditionally can
+    // send the driver to an unrelated location. Coordinates are a fallback only.
+    final destinationQuery = destination.isNotEmpty
+        ? destination
+        : '${lat.toString()},${lng.toString()}';
+
     final Uri uri = choice == 'google'
-        ? Uri.parse(
-            'google.navigation:q=${Uri.encodeComponent(destinationQuery)}&mode=d',
+        ? Uri.https(
+            'www.google.com',
+            '/maps/dir/',
+            {
+              'api': '1',
+              'destination': destinationQuery,
+              'travelmode': 'driving',
+            },
           )
-        : Uri.parse(
-            hasCoordinates
-                ? 'https://waze.com/ul?ll=${Uri.encodeComponent('${lat.toString()},${lng.toString()}')}&navigate=yes'
-                : 'https://waze.com/ul?q=${Uri.encodeComponent(destination)}&navigate=yes',
+        : Uri.https(
+            'waze.com',
+            '/ul',
+            {
+              if (destination.isNotEmpty) 'q': destinationQuery,
+              if (destination.isEmpty && hasCoordinates)
+                'll': '${lat.toString()},${lng.toString()}',
+              'navigate': 'yes',
+            },
           );
 
     try {
-      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final opened = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
       if (!opened && mounted) {
         _showMessage('Could not open the selected navigation app.');
       }
