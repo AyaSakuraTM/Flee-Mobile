@@ -121,6 +121,38 @@ class ApiService {
     );
   }
 
+  Future<void> completeDispatch(int dispatchId) async {
+    final token = await _authService.getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Please log in again to complete this delivery.');
+    }
+
+    final response = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/mobile/dispatches/$dispatchId/complete'),
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    Map<String, dynamic> data;
+    try {
+      final decoded = jsonDecode(response.body);
+      data = decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+    } catch (_) {
+      data = <String, dynamic>{};
+    }
+
+    if (response.statusCode == 200 && data['success'] == true) return;
+    if (response.statusCode == 401) {
+      throw Exception('Your session expired. Please log in again.');
+    }
+    throw Exception(
+      data['error'] ?? data['message'] ??
+          'Failed to complete delivery (${response.statusCode}).',
+    );
+  }
+
   Future<void> updateLocation(
     int riderId,
     double latitude,

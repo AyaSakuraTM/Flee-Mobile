@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'screens/login_screen.dart';
 import 'services/api_service.dart';
@@ -244,6 +245,7 @@ class _FleetOpsHomePageState extends State<FleetOpsHomePage>
   bool isTracking = false;
   bool isStartingTracking = false;
   bool isStoppingTracking = false;
+  bool isCompletingDelivery = false;
   bool isLoadingDispatches = true;
 
   bool _checkingTrackingStatus = false;
@@ -559,6 +561,131 @@ class _FleetOpsHomePageState extends State<FleetOpsHomePage>
       if (mounted) {
         setState(() => isStartingTracking = false);
       }
+    }
+  }
+
+
+  Future<void> _completeDelivery(Map dispatch) async {
+    if (isCompletingDelivery || isStartingTracking || isStoppingTracking) return;
+
+    final dispatchId = int.tryParse(dispatch['id']?.toString() ?? '');
+    if (dispatchId == null || dispatchId <= 0) {
+      _showMessage('This dispatch has no valid ID.');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Complete delivery?'),
+        content: const Text(
+          'Only confirm after the delivery has been handed over. '
+          'This will mark the dispatch completed and stop its tracking.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Complete delivery'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => isCompletingDelivery = true);
+    try {
+      await _apiService.completeDispatch(dispatchId);
+
+      if (isTracking && trackingDispatchId == dispatchId) {
+        try {
+          await FlutterForegroundTask.stopService();
+        } catch (e) {
+          debugPrint('Delivery completed, but tracking stop failed: $e');
+        } finally {
+          await _storage.delete(key: _selectedVehicleKey);
+          if (mounted) {
+            setState(() {
+              isTracking = false;
+              trackingDispatchId = null;
+              isStoppingTracking = false;
+            });
+          }
+        }
+      }
+
+      await _loadDispatches();
+      if (mounted) _showMessage('Delivery completed successfully.');
+    } catch (e) {
+      if (mounted) _showMessage('Could not complete delivery: ${_readableError(e)}');
+    } finally {
+      if (mounted) setState(() => isCompletingDelivery = false);
+    }
+  }
+
+  Future<void> _openNavigation(Map dispatch) async {
+    final destination = _value(dispatch, 'destination').trim();
+    final lat = _coordinate(dispatch, 'dest_lat');
+    final lng = _coordinate(dispatch, 'dest_lng');
+    final hasCoordinates = lat != null && lng != null &&
+        lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+
+    if (!hasCoordinates && destination.isEmpty) {
+      _showMessage('This dispatch has no destination address or coordinates.');
+      return;
+    }
+
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('Choose navigation app'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(dialogContext).pop('google'),
+            child: const ListTile(
+              leading: Icon(Icons.map_outlined),
+              title: Text('Google Maps'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(dialogContext).pop('waze'),
+            child: const ListTile(
+              leading: Icon(Icons.navigation_rounded),
+              title: Text('Waze'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (choice == null || !mounted) return;
+
+    final destinationQuery = hasCoordinates
+        ? '${lat.toString()},${lng.toString()}'
+        : destination;
+    final Uri uri = choice == 'google'
+        ? Uri.parse(
+            'https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(destinationQuery)}&travelmode=driving',
+          )
+        : Uri.parse(
+            hasCoordinates
+                ? 'https://waze.com/ul?ll=${Uri.encodeComponent('${lat.toString()},${lng.toString()}')}&navigate=yes'
+                : 'https://waze.com/ul?q=${Uri.encodeComponent(destination)}&navigate=yes',
+          );
+
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) {
+        _showMessage('Could not open the selected navigation app.');
+      }
+    } catch (e) {
+      if (mounted) _showMessage('Could not open navigation: $e');
     }
   }
 
@@ -1031,12 +1158,47 @@ class _FleetOpsHomePageState extends State<FleetOpsHomePage>
                                   primaryText: primaryText,
                                   secondaryText: secondaryText,
                                 ),
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    onPressed: isCompletingDelivery
+                                        ? null
+                                        : () => _openNavigation(dispatch),
+                                    icon: const Icon(Icons.navigation_rounded),
+                                    label: const Text('Navigate'),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton.icon(
+                                    onPressed: isCompletingDelivery
+                                        ? null
+                                        : () => _completeDelivery(dispatch),
+                                    icon: const Icon(Icons.check_circle_outline_rounded),
+                                    label: Text(
+                                      isCompletingDelivery
+                                          ? 'Completing delivery...'
+                                          : 'Complete Delivery',
+                                    ),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: const Color(0xFF15803D),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                  ),
+                                ),
                                 const SizedBox(height: 18),
                                 SizedBox(
                                   width: double.infinity,
                                   child: FilledButton.icon(
                                     onPressed:
-                                        (isStartingTracking ||
+                                        (isCompletingDelivery ||
+                                                isStartingTracking ||
                                                 isStoppingTracking ||
                                                 (isTracking &&
                                                     !isThisTracking))
