@@ -1,7 +1,9 @@
-
+﻿
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:geolocator/geolocator.dart';
@@ -375,6 +377,15 @@ class _FleetOpsHomePageState extends State<FleetOpsHomePage>
     return int.tryParse(value);
   }
 
+
+  double? _coordinate(dynamic item, String key) {
+    if (item is! Map) return null;
+    final value = item[key];
+    final result = value is num
+        ? value.toDouble()
+        : double.tryParse(value?.toString() ?? '');
+    return result != null && result.isFinite ? result : null;
+  }
   String _dispatchNumber(dynamic item) {
     final number = _value(item, 'dispatch_no');
 
@@ -668,7 +679,7 @@ class _FleetOpsHomePageState extends State<FleetOpsHomePage>
               const SizedBox(height: 28),
 
               Text(
-                'Welcome back 👋',
+                'Welcome back ðŸ‘‹',
                 style: TextStyle(
                   fontSize: 15,
                   color: secondaryText,
@@ -1013,6 +1024,14 @@ class _FleetOpsHomePageState extends State<FleetOpsHomePage>
                                   secondaryText,
                                 ),
                                 const SizedBox(height: 18),
+                                _buildDispatchMap(
+                                  dispatch: dispatch,
+                                  isDarkMode: isDarkMode,
+                                  cardColor: cardColor,
+                                  primaryText: primaryText,
+                                  secondaryText: secondaryText,
+                                ),
+                                const SizedBox(height: 18),
                                 SizedBox(
                                   width: double.infinity,
                                   child: FilledButton.icon(
@@ -1075,96 +1094,12 @@ class _FleetOpsHomePageState extends State<FleetOpsHomePage>
                   );
                 }),
 
-              const SizedBox(height: 12),
-
-              // Map placeholder retained from the previous home screen.
-              Container(
-                height: 170,
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: isDarkMode
-                        ? Colors.white10
-                        : const Color(0xFFE2E8F0),
-                  ),
-                ),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(22),
-                        child: CustomPaint(
-                          painter: _MapPreviewPainter(
-                            isDarkMode: isDarkMode,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 15,
-                      left: 16,
-                      child: Text(
-                        'MAP PREVIEW',
-                        style: TextStyle(
-                          color: secondaryText,
-                          fontSize: 11,
-                          letterSpacing: 1,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    Center(
-                      child: Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2563EB),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 4,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.local_shipping_rounded,
-                          color: Colors.white,
-                          size: 25,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 14,
-                      left: 16,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_outlined,
-                            size: 16,
-                            color: secondaryText,
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            isTracking
-                                ? 'Tracking service running'
-                                : 'Map illustration — not live GPS',
-                            style: TextStyle(
-                              color: secondaryText,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
 
               const SizedBox(height: 24),
               Center(
                 child: Text(
                   loginEmail == null || loginEmail!.isEmpty
-                      ? 'FleetOps • Fleet Tracking System'
+                      ? 'FleetOps â€¢ Fleet Tracking System'
                       : 'Signed in as $loginEmail',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -1272,6 +1207,144 @@ class _FleetOpsHomePageState extends State<FleetOpsHomePage>
     );
   }
 
+  Widget _buildDispatchMap({
+    required Map dispatch,
+    required bool isDarkMode,
+    required Color cardColor,
+    required Color primaryText,
+    required Color secondaryText,
+  }) {
+    final olat = _coordinate(dispatch, 'origin_lat');
+    final olng = _coordinate(dispatch, 'origin_lng');
+    final dlat = _coordinate(dispatch, 'dest_lat');
+    final dlng = _coordinate(dispatch, 'dest_lng');
+    final vlat = _coordinate(dispatch, 'current_latitude');
+    final vlng = _coordinate(dispatch, 'current_longitude');
+
+    bool valid(double? lat, double? lng) =>
+        lat != null && lng != null &&
+        lat >= -90 && lat <= 90 &&
+        lng >= -180 && lng <= 180;
+
+    final hasOrigin = valid(olat, olng);
+    final hasDestination = valid(dlat, dlng);
+    final hasVehicle = valid(vlat, vlng);
+
+    final points = <LatLng>[
+      if (hasOrigin) LatLng(olat!, olng!),
+      if (hasDestination) LatLng(dlat!, dlng!),
+      if (hasVehicle) LatLng(vlat!, vlng!),
+    ];
+
+    Widget marker(IconData icon, Color color) => Container(
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+      ),
+      alignment: Alignment.center,
+      child: Icon(icon, color: Colors.white, size: 21),
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDarkMode ? Colors.white12 : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(
+              'Dispatch map',
+              style: TextStyle(
+                color: primaryText,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          if (points.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                'Map unavailable: no valid coordinates have been recorded.',
+                style: TextStyle(color: secondaryText, fontSize: 12),
+              ),
+            )
+          else
+            SizedBox(
+              height: 220,
+              child: FlutterMap(
+                options: MapOptions(
+                  initialCenter: LatLng(
+                    points.map((p) => p.latitude).reduce((a, b) => a + b) /
+                        points.length,
+                    points.map((p) => p.longitude).reduce((a, b) => a + b) /
+                        points.length,
+                  ),
+                  initialZoom: points.length == 1 ? 14 : 11,
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.example.fleetops',
+                  ),
+                  MarkerLayer(
+                    markers: [
+                      if (hasOrigin)
+                        Marker(
+                          point: LatLng(olat!, olng!),
+                          width: 40,
+                          height: 40,
+                          child: marker(Icons.trip_origin, Colors.green),
+                        ),
+                      if (hasDestination)
+                        Marker(
+                          point: LatLng(dlat!, dlng!),
+                          width: 40,
+                          height: 40,
+                          child: marker(Icons.location_on, Colors.red),
+                        ),
+                      if (hasVehicle)
+                        Marker(
+                          point: LatLng(vlat!, vlng!),
+                          width: 40,
+                          height: 40,
+                          child: marker(Icons.local_shipping, Colors.blue),
+                        ),
+                    ],
+                  ),
+                  RichAttributionWidget(
+                    attributions: [
+                      TextSourceAttribution('OpenStreetMap contributors'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                if (hasOrigin)
+                  const _MapLegendItem(color: Colors.green, label: 'Origin'),
+                if (hasDestination)
+                  const _MapLegendItem(color: Colors.red, label: 'Destination'),
+                if (hasVehicle)
+                  const _MapLegendItem(color: Colors.blue, label: 'Latest vehicle location'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   Widget _detailRow(
     String label,
     String value,
@@ -1306,57 +1379,24 @@ class _FleetOpsHomePageState extends State<FleetOpsHomePage>
   }
 }
 
-// ------------------------------------------------------------
-// DECORATIVE MAP PREVIEW (NOT A LIVE MAP)
-// ------------------------------------------------------------
+class _MapLegendItem extends StatelessWidget {
+  const _MapLegendItem({required this.color, required this.label});
 
-class _MapPreviewPainter extends CustomPainter {
-  _MapPreviewPainter({required this.isDarkMode});
-
-  final bool isDarkMode;
+  final Color color;
+  final String label;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final roadPaint = Paint()
-      ..color = isDarkMode
-          ? const Color(0xFF334155)
-          : const Color(0xFFFFFFFF)
-      ..strokeWidth = 8
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final thinRoadPaint = Paint()
-      ..color = isDarkMode
-          ? const Color(0xFF475569)
-          : const Color(0xFFDBEAFE)
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final paths = <Path>[
-      Path()
-        ..moveTo(-10, size.height * 0.25)
-        ..lineTo(size.width * 0.35, size.height * 0.55)
-        ..lineTo(size.width * 0.70, size.height * 0.20)
-        ..lineTo(size.width + 10, size.height * 0.45),
-      Path()
-        ..moveTo(size.width * 0.10, size.height + 10)
-        ..lineTo(size.width * 0.45, size.height * 0.55)
-        ..lineTo(size.width * 0.60, -10),
-      Path()
-        ..moveTo(size.width * 0.80, size.height + 10)
-        ..lineTo(size.width * 0.68, size.height * 0.65)
-        ..lineTo(size.width + 10, size.height * 0.70),
-    ];
-
-    for (final path in paths) {
-      canvas.drawPath(path, roadPaint);
-      canvas.drawPath(path, thinRoadPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _MapPreviewPainter oldDelegate) {
-    return oldDelegate.isDarkMode != isDarkMode;
-  }
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 9,
+        height: 9,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 5),
+      Text(label, style: const TextStyle(fontSize: 11)),
+    ],
+  );
 }
+

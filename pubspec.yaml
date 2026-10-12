@@ -20,6 +20,8 @@ dependencies:
   google_maps_flutter: ^2.18.2
   flutter_foreground_task: ^11.0.3
   geolocator_android: ^5.1.1
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
 
 dev_dependencies:
   flutter_test:
