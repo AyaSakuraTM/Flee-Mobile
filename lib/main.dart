@@ -669,9 +669,11 @@ class _FleetOpsHomePageState extends State<FleetOpsHomePage>
     final destinationQuery = hasCoordinates
         ? '${lat.toString()},${lng.toString()}'
         : destination;
+    // The Google Maps navigation URI uses the phone's live location as
+    // the starting point and opens turn-by-turn driving navigation.
     final Uri uri = choice == 'google'
         ? Uri.parse(
-            'https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(destinationQuery)}&travelmode=driving',
+            'google.navigation:q=${Uri.encodeComponent(destinationQuery)}&mode=d',
           )
         : Uri.parse(
             hasCoordinates
