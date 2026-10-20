@@ -1,6 +1,6 @@
 class ApiConfig {
   static const String baseUrl =
-      'https://fleetops.archonnellincorporated.com/api';
+      'https://logitrack.archonnellincorporated.com/api';
 
   // Mobile authentication
   static const String login =
